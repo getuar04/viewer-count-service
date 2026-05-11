@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant V as Viewer Count Service
+    participant K as Kafka
+    participant R as Redis
+
+    Note over U,R: 1. Heartbeat
+    loop every 30s
+        U->>V: POST /streams/{streamId}/heartbeat {userId}
+        V->>V: validate JWT token
+        V->>K: publish ViewerHeartbeat {streamId, userId}
+        K->>V: consume ViewerHeartbeat
+        V->>R: SETEX viewer:{userId} 60
+    end
+
+    Note over V,R: 2. Ghost User
+    R->>V: EXPIRED viewer:{userId}
+    V->>R: SISMEMBER viewers {userId}
+    R-->>V: 1 or 0
+    alt exists
+        V->>R: SREM viewers {userId}
+        V->>R: DECR viewer_count
+    else already removed
+        Note over V: Ignore
+    end
