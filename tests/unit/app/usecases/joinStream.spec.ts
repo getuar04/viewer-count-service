@@ -9,9 +9,17 @@ const mockRepo: jest.Mocked<IViewerRepository> = {
 };
 
 describe('JoinStream', () => {
+  beforeEach(() => jest.clearAllMocks());
+
   it('should call repo.join with correct params', async () => {
     const usecase = new JoinStream(mockRepo);
     await usecase.execute('stream-1', 'user-1');
     expect(mockRepo.join).toHaveBeenCalledWith('stream-1', 'user-1');
+  });
+
+  it('should call repo.join once', async () => {
+    const usecase = new JoinStream(mockRepo);
+    await usecase.execute('stream-1', 'user-1');
+    expect(mockRepo.join).toHaveBeenCalledTimes(1);
   });
 });

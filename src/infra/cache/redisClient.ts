@@ -1,5 +1,5 @@
 import { createClient } from 'redis';
-import { env } from '../config/env';
+import { env } from '../../infra/config/env';
 import { logger } from '../logger/logger';
 
 export const redisClient = createClient({
