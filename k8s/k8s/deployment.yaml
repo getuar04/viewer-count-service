@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: viewer-count-service
+  namespace: viewer-count-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: viewer-count-service
+  template:
+    metadata:
+      labels:
+        app: viewer-count-service
+    spec:
+      initContainers:
+        - name: wait-for-redis
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c", "until nc -z redis-service 6379; do sleep 2; done"]
+        - name: wait-for-kafka
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c", "until nc -z kafka-service 9092; do sleep 2; done"]
+      containers:
+        - name: viewer-count-service
+          image: viewer-count-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          envFrom:
+            - configMapRef:
+                name: viewer-count-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: viewer-count-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
