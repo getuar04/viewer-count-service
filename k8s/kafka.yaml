@@ -13,9 +13,12 @@ spec:
       labels:
         app: zookeeper
     spec:
+      securityContext:
+        runAsUser: 0
       containers:
         - name: zookeeper
           image: confluentinc/cp-zookeeper:7.4.0
+          imagePullPolicy: Never
           ports:
             - containerPort: 2181
           env:
@@ -61,6 +64,7 @@ spec:
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.4.0
+          imagePullPolicy: Never
           ports:
             - containerPort: 9092
           env:
