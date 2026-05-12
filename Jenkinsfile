@@ -67,10 +67,10 @@ PYEOF
           def kube = "--kubeconfig ${WORKSPACE}/.kube/config"
           sh "kubectl apply -f k8s/namespace.yaml  ${kube}"
           sh "kubectl apply -f k8s/configmap.yaml  ${kube}"
-          sh "kubectl apply -f k8s/secret.yaml     ${kube}"
           sh "kubectl apply -f k8s/redis.yaml      ${kube}"
           sh "kubectl apply -f k8s/kafka.yaml      ${kube}"
           sh "kubectl apply -f k8s/deployment.yaml ${kube}"
+          sh "kubectl apply -f k8s/service.yaml    ${kube}"
           sh """
             kubectl patch deployment viewer-count-service \
               -n ${K8S_NAMESPACE} ${kube} \
