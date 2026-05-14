@@ -415,6 +415,17 @@ SMEMBERS stream:456:viewers
 TTL stream:456:viewer:123
 ```
 
+### Kafka CLI
+
+```bash
+docker exec -it vcs-kafka bash
+kafka-console-consumer --bootstrap-server localhost:9092 --topic viewer-events --from-beginning
+```
+
+### logs 
+```bash
+docker logs -f viewer-count-service
+
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw
 
 # Health check
