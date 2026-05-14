@@ -3,7 +3,7 @@ const mockSubscriberClient = {
   pSubscribe: jest.fn().mockResolvedValue(undefined),
 };
 
-jest.mock("../../../../src/infra/cache/redisClient", () => ({
+jest.mock("../../../../src/infra/redis/redisClient", () => ({
   redisClient: {
     sAdd: jest.fn().mockResolvedValue(1),
     sRem: jest.fn().mockResolvedValue(1),
@@ -33,7 +33,7 @@ jest.mock("../../../../src/infra/logger/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { startKeyspaceListener } from "../../../../src/infra/cache/redisSubscriber";
+import { startKeyspaceListener } from "../../../../src/infra/redis/redisSubscriber";
 
 describe("redisSubscriber", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -52,7 +52,7 @@ describe("redisSubscriber", () => {
   });
 
   it("should handle expired viewer key and remove from set", async () => {
-    const { redisClient } = require("../../../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../../../src/infra/redis/redisClient");
 
     mockSubscriberClient.pSubscribe.mockImplementation(
       async (_pattern: string, callback: Function) => {
@@ -65,7 +65,7 @@ describe("redisSubscriber", () => {
   });
 
   it("should ignore non-viewer expired keys", async () => {
-    const { redisClient } = require("../../../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../../../src/infra/redis/redisClient");
 
     mockSubscriberClient.pSubscribe.mockImplementation(
       async (_pattern: string, callback: Function) => {

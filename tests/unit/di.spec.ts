@@ -1,4 +1,4 @@
-jest.mock("../../src/infra/cache/redisClient", () => ({
+jest.mock("../../src/infra/redis/redisClient", () => ({
   redisClient: {
     sAdd: jest.fn(),
     sRem: jest.fn(),

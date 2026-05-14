@@ -29,7 +29,7 @@ jest.mock("../../../../src/infra/logger/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-jest.mock("../../../../src/infra/cache/redisClient", () => ({
+jest.mock("../../../../src/infra/redis/redisClient", () => ({
   redisClient: {
     sAdd: jest.fn().mockResolvedValue(1),
     sRem: jest.fn().mockResolvedValue(1),
@@ -38,10 +38,12 @@ jest.mock("../../../../src/infra/cache/redisClient", () => ({
     setEx: jest.fn().mockResolvedValue("OK"),
     del: jest.fn().mockResolvedValue(1),
     get: jest.fn().mockResolvedValue("1"),
+    set: jest.fn().mockResolvedValue("OK"),
+    exists: jest.fn().mockResolvedValue(1),
   },
 }));
 
-import { startKafkaConsumer } from "../../../../src/infra/messaging/kafkaConsumer";
+import { startKafkaConsumer } from "../../../../src/infra/kafka/kafkaConsumer";
 
 describe("kafkaConsumer", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -65,7 +67,7 @@ describe("kafkaConsumer", () => {
   });
 
   it("should process ViewerJoined event", async () => {
-    const { redisClient } = require("../../../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../../../src/infra/redis/redisClient");
 
     mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
       await eachMessage({
@@ -87,7 +89,7 @@ describe("kafkaConsumer", () => {
   });
 
   it("should process ViewerLeft event", async () => {
-    const { redisClient } = require("../../../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../../../src/infra/redis/redisClient");
 
     mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
       await eachMessage({
@@ -109,7 +111,7 @@ describe("kafkaConsumer", () => {
   });
 
   it("should process ViewerHeartbeat event", async () => {
-    const { redisClient } = require("../../../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../../../src/infra/redis/redisClient");
 
     mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
       await eachMessage({
@@ -131,7 +133,7 @@ describe("kafkaConsumer", () => {
   });
 
   it("should ignore message with no value", async () => {
-    const { redisClient } = require("../../../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../../../src/infra/redis/redisClient");
 
     mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
       await eachMessage({ message: { value: null } });

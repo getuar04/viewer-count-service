@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { redisClient } from '../cache/redisClient';
+import { redisClient } from '../redis/redisClient';
 
 const router = Router();
 

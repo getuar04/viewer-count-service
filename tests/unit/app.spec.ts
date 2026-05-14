@@ -1,4 +1,4 @@
-jest.mock("../../src/infra/cache/redisClient", () => ({
+jest.mock("../../src/infra/redis/redisClient", () => ({
   redisClient: { ping: jest.fn().mockResolvedValue("PONG") },
 }));
 
@@ -24,7 +24,7 @@ import app from "../../src/app";
 
 describe("app", () => {
   it("should have health route", async () => {
-    const { redisClient } = require("../../src/infra/cache/redisClient");
+    const { redisClient } = require("../../src/infra/redis/redisClient");
     (redisClient.ping as jest.Mock).mockResolvedValue("PONG");
 
     const res = await request(app).get("/health");

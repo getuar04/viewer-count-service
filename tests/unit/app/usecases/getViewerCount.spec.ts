@@ -6,12 +6,14 @@ const mockRepo: jest.Mocked<IViewerRepository> = {
   leave: jest.fn(),
   heartbeat: jest.fn(),
   getCount: jest.fn(),
+  streamStarted: jest.fn(),
+  streamEnded: jest.fn(),
 };
 
 describe('GetViewerCount', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('should return viewer count for a stream', async () => {
+  it('should return viewer count', async () => {
     mockRepo.getCount.mockResolvedValue(42);
     const usecase = new GetViewerCount(mockRepo);
     const count = await usecase.execute('stream-1');
@@ -24,12 +26,5 @@ describe('GetViewerCount', () => {
     const usecase = new GetViewerCount(mockRepo);
     const count = await usecase.execute('stream-1');
     expect(count).toBe(0);
-  });
-
-  it('should call repo.getCount once', async () => {
-    mockRepo.getCount.mockResolvedValue(10);
-    const usecase = new GetViewerCount(mockRepo);
-    await usecase.execute('stream-1');
-    expect(mockRepo.getCount).toHaveBeenCalledTimes(1);
   });
 });

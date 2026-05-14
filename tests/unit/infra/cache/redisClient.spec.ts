@@ -20,7 +20,7 @@ jest.mock("../../../../src/infra/logger/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { connectRedis } from "../../../../src/infra/cache/redisClient";
+import { connectRedis } from "../../../../src/infra/redis/redisClient";
 
 describe("redisClient", () => {
   beforeEach(() => jest.clearAllMocks());

@@ -1,11 +1,12 @@
-version: '3.8'
+version: "3.8"
 
 services:
   redis:
     image: redis:7-alpine
     container_name: vcs-redis
+    command: redis-server --notify-keyspace-events Ex
     ports:
-      - '6379:6379'
+      - "6379:6379"
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -19,22 +20,36 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - '9092:9092'
+      - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
 
   app:
     build: .
     container_name: vcs-app
     ports:
-      - '3000:3000'
+      - "3000:3000"
     depends_on:
-      - redis
-      - kafka
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: on-failure
     environment:
       PORT: 3000
       REDIS_HOST: redis
@@ -42,3 +57,4 @@ services:
       KAFKA_BROKER: kafka:9092
       KAFKA_GROUP_ID: viewer-count-group
       KAFKA_TOPIC: viewer-events
+      JWT_SECRET: 657928478954RUHD879YHN38R7Y9UJD3HY6R87HIDY3H879UEJH7389RYUN487EY9RHID3879HD387WIHSDNBYU3R87EY3879HD2UY3R7hdubuy3d7dh398ndyx3edhuy87diu

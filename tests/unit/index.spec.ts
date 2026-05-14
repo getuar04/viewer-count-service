@@ -1,13 +1,13 @@
-jest.mock("../../src/infra/cache/redisClient", () => ({
+jest.mock("../../src/infra/redis/redisClient", () => ({
   redisClient: { ping: jest.fn() },
   connectRedis: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock("../../src/infra/messaging/kafkaConsumer", () => ({
+jest.mock("../../src/infra/kafka/kafkaConsumer", () => ({
   startKafkaConsumer: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock("../../src/infra/cache/redisSubscriber", () => ({
+jest.mock("../../src/infra/redis/redisSubscriber", () => ({
   startKeyspaceListener: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -43,7 +43,7 @@ describe("index bootstrap", () => {
   it("should call connectRedis on bootstrap", async () => {
     require("../../src/index");
     await new Promise((resolve) => setTimeout(resolve, 200));
-    const { connectRedis } = require("../../src/infra/cache/redisClient");
+    const { connectRedis } = require("../../src/infra/redis/redisClient");
     expect(connectRedis).toBeDefined();
   });
 
