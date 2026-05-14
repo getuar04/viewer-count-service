@@ -52,7 +52,6 @@ PYEOF
     retry(2) {
       sh """
         docker build \
-          --cache-from ${IMAGE_NAME}:latest \
           -t ${IMAGE_NAME}:${IMAGE_TAG} \
           -t ${IMAGE_NAME}:latest \
           .
