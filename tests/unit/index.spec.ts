@@ -1,3 +1,18 @@
+jest.mock("kafkajs", () => ({
+  Kafka: jest.fn().mockImplementation(() => ({
+    producer: jest.fn().mockReturnValue({
+      connect: jest.fn().mockResolvedValue(undefined),
+      send: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn().mockResolvedValue(undefined),
+    }),
+    consumer: jest.fn().mockReturnValue({
+      connect: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue(undefined),
+      run: jest.fn().mockResolvedValue(undefined),
+    }),
+  })),
+}));
+
 jest.mock("../../src/infra/redis/redisClient", () => ({
   redisClient: { ping: jest.fn() },
   connectRedis: jest.fn().mockResolvedValue(undefined),
