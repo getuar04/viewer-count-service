@@ -15,7 +15,7 @@ pipeline {
       steps {
         script {
           sh "mkdir -p ${WORKSPACE}/.kube"
-          sh "cp /var/jenkins_home/.kube/config ${WORKSPACE}/.kube/config"
+          sh "cp /root/.kube/config ${WORKSPACE}/.kube/config"
           sh "sed -i 's|https://127.0.0.1|https://host.docker.internal|g' ${WORKSPACE}/.kube/config"
           sh "sed -i 's|https://localhost|https://host.docker.internal|g' ${WORKSPACE}/.kube/config"
           sh """
@@ -34,6 +34,7 @@ with open("${WORKSPACE}/.kube/config", "w") as f:
 print("Kubeconfig modified successfully")
 PYEOF
           """
+          sh "cat ${WORKSPACE}/.kube/config"
         }
       }
     }
@@ -48,27 +49,27 @@ PYEOF
       }
     }
     stage('Build Docker Image') {
-  steps {
-    retry(2) {
-      sh """
-        docker build \
-          -t ${IMAGE_NAME}:${IMAGE_TAG} \
-          -t ${IMAGE_NAME}:latest \
-          .
-      """
+      steps {
+        retry(2) {
+          sh """
+            docker build \
+              -t ${IMAGE_NAME}:${IMAGE_TAG} \
+              -t ${IMAGE_NAME}:latest \
+              .
+          """
+        }
+      }
     }
-  }
-}
     stage('Deploy to Kubernetes') {
       steps {
         script {
           def kube = "--kubeconfig ${WORKSPACE}/.kube/config"
-          sh "kubectl apply -f k8s/namespace.yaml  ${kube} --validate=false"
-sh "kubectl apply -f k8s/configmap.yaml  ${kube} --validate=false"
-sh "kubectl apply -f k8s/redis.yaml      ${kube} --validate=false"
-sh "kubectl apply -f k8s/kafka.yaml      ${kube} --validate=false"
-sh "kubectl apply -f k8s/deployment.yaml ${kube} --validate=false"
-sh "kubectl apply -f k8s/service.yaml    ${kube} --validate=false"
+          sh "kubectl apply -f k8s/namespace.yaml  ${kube}"
+          sh "kubectl apply -f k8s/configmap.yaml  ${kube}"
+          sh "kubectl apply -f k8s/redis.yaml      ${kube}"
+          sh "kubectl apply -f k8s/kafka.yaml      ${kube}"
+          sh "kubectl apply -f k8s/deployment.yaml ${kube}"
+          sh "kubectl apply -f k8s/service.yaml    ${kube}"
           sh """
             kubectl patch deployment viewer-count-service \
               -n ${K8S_NAMESPACE} ${kube} \
