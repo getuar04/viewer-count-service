@@ -137,6 +137,7 @@ describe("RedisViewerRepository", () => {
 
   describe("heartbeat", () => {
     it("should SETEX with correct TTL", async () => {
+      (mockRedis.exists as jest.Mock).mockResolvedValue(1);
       (mockRedis.setEx as jest.Mock).mockResolvedValue("OK");
 
       await repo.heartbeat("stream-1", "user-1");
@@ -147,7 +148,26 @@ describe("RedisViewerRepository", () => {
         "alive",
       );
     });
+
+    it("should throw when heartbeat stream is not active", async () => {
+      (mockRedis.exists as jest.Mock).mockResolvedValue(0);
+      await expect(repo.heartbeat("stream-1", "user-1")).rejects.toThrow("Stream not active");
+    });
   });
+
+
+  describe("isStreamActive", () => {
+    it("should return true when stream exists", async () => {
+      (mockRedis.exists as jest.Mock).mockResolvedValue(1);
+      await expect(repo.isStreamActive("stream-1")).resolves.toBe(true);
+    });
+
+    it("should return false when stream does not exist", async () => {
+      (mockRedis.exists as jest.Mock).mockResolvedValue(0);
+      await expect(repo.isStreamActive("stream-1")).resolves.toBe(false);
+    });
+  });
+
 
   describe("getCount", () => {
     it("should return viewer count", async () => {

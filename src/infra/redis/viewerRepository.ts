@@ -33,8 +33,13 @@ export class RedisViewerRepository implements IViewerRepository {
     logger.info({ streamId }, 'Stream ended');
   }
 
-  async join(streamId: string, userId: string): Promise<void> {
+  async isStreamActive(streamId: string): Promise<boolean> {
     const isActive = await redisClient.exists(this.activeStreamKey(streamId));
+    return isActive === 1;
+  }
+
+  async join(streamId: string, userId: string): Promise<void> {
+    const isActive = await this.isStreamActive(streamId);
     if (!isActive) {
       logger.warn({ streamId, userId }, 'Join rejected - stream not active');
       throw new Error('Stream not active');
@@ -57,6 +62,12 @@ export class RedisViewerRepository implements IViewerRepository {
   }
 
   async heartbeat(streamId: string, userId: string): Promise<void> {
+    const isActive = await this.isStreamActive(streamId);
+    if (!isActive) {
+      logger.warn({ streamId, userId }, 'Heartbeat rejected - stream not active');
+      throw new Error('Stream not active');
+    }
+
     await redisClient.setEx(this.heartbeatKey(streamId, userId), HEARTBEAT_TTL, 'alive');
     logger.info({ streamId, userId }, 'Heartbeat received');
   }

@@ -1,72 +1,79 @@
-jest.mock("kafkajs", () => ({
-  Kafka: jest.fn().mockImplementation(() => ({
-    producer: jest.fn().mockReturnValue({
-      connect: jest.fn().mockResolvedValue(undefined),
-      send: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-    }),
-    consumer: jest.fn().mockReturnValue({
-      connect: jest.fn().mockResolvedValue(undefined),
-      subscribe: jest.fn().mockResolvedValue(undefined),
-      run: jest.fn().mockResolvedValue(undefined),
-    }),
-  })),
-}));
+const mockListen = jest.fn((_port: number, cb: Function) => cb());
+const mockConnectRedis = jest.fn().mockResolvedValue(undefined);
+const mockStartKafkaConsumer = jest.fn().mockResolvedValue(undefined);
+const mockStartKeyspaceListener = jest.fn().mockResolvedValue(undefined);
+const mockLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
-jest.mock("../../src/infra/redis/redisClient", () => ({
+jest.mock('../../src/infra/redis/redisClient', () => ({
   redisClient: { ping: jest.fn() },
-  connectRedis: jest.fn().mockResolvedValue(undefined),
+  connectRedis: mockConnectRedis,
 }));
 
-jest.mock("../../src/infra/kafka/kafkaConsumer", () => ({
-  startKafkaConsumer: jest.fn().mockResolvedValue(undefined),
+jest.mock('../../src/infra/kafka/kafkaConsumer', () => ({
+  startKafkaConsumer: mockStartKafkaConsumer,
 }));
 
-jest.mock("../../src/infra/redis/redisSubscriber", () => ({
-  startKeyspaceListener: jest.fn().mockResolvedValue(undefined),
+jest.mock('../../src/infra/redis/redisSubscriber', () => ({
+  startKeyspaceListener: mockStartKeyspaceListener,
 }));
 
-jest.mock("../../src/infra/logger/logger", () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
-}));
+jest.mock('../../src/infra/logger/logger', () => ({ logger: mockLogger }));
 
-jest.mock("../../src/infra/config/env", () => ({
+jest.mock('../../src/infra/config/env', () => ({
   env: {
-    jwtSecret: "test-secret",
-    redis: { host: "localhost", port: 6379 },
-    kafka: { broker: "localhost:9092", groupId: "test", topic: "test" },
+    jwtSecret: 'test-secret',
+    redis: { host: 'localhost', port: 6379 },
+    kafka: { broker: 'localhost:9092', groupId: 'test', topic: 'test' },
     port: 3000,
   },
 }));
 
-jest.mock("../../src/app", () => ({
-  default: {
-    listen: jest.fn().mockImplementation((_port: number, cb: Function) => cb()),
-  },
-}));
+jest.mock('../../src/app', () => ({ __esModule: true, default: { listen: mockListen } }));
 
-const mockExit = jest
-  .spyOn(process, "exit")
-  .mockImplementation((() => {}) as any);
+describe('index bootstrap', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  let exitSpy: jest.SpyInstance;
 
-describe("index bootstrap", () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    process.env.NODE_ENV = 'test';
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
   });
 
-  it("should call connectRedis on bootstrap", async () => {
-    require("../../src/index");
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const { connectRedis } = require("../../src/infra/redis/redisClient");
-    expect(connectRedis).toBeDefined();
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    exitSpy.mockRestore();
   });
 
-  it("should not crash on load", async () => {
-    expect(() => require("../../src/index")).not.toThrow();
+  it('bootstraps redis, keyspace listener, kafka consumer and HTTP server', async () => {
+    const { bootstrap } = require('../../src/index');
+
+    await bootstrap();
+
+    expect(mockConnectRedis).toHaveBeenCalled();
+    expect(mockStartKeyspaceListener).toHaveBeenCalled();
+    expect(mockStartKafkaConsumer).toHaveBeenCalled();
+    expect(mockListen).toHaveBeenCalledWith(3000, expect.any(Function));
+    expect(mockLogger.info).toHaveBeenCalledWith('Viewer Count Service running on port 3000');
   });
 
-  it("should mock process exit", () => {
-    expect(mockExit).toBeDefined();
+  it('logs and exits when start bootstrap fails', async () => {
+    mockConnectRedis.mockRejectedValueOnce(new Error('redis down'));
+    const { start } = require('../../src/index');
+
+    start();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.any(Object), 'Failed to start service');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+
+  it('auto-starts outside test environment', async () => {
+    process.env.NODE_ENV = 'development';
+    require('../../src/index');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mockConnectRedis).toHaveBeenCalled();
   });
 });

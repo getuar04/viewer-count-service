@@ -3,6 +3,7 @@ jest.mock("kafkajs", () => ({
     producer: jest.fn().mockReturnValue({
       connect: jest.fn().mockResolvedValue(undefined),
       send: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn().mockResolvedValue(undefined),
     }),
     consumer: jest.fn().mockReturnValue({
       connect: jest.fn().mockResolvedValue(undefined),
@@ -72,9 +73,9 @@ describe("Routes", () => {
         .set("Authorization", token)
         .send({ userId: "user-1" });
 
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("viewerCount");
-      expect(res.body).toHaveProperty("streamId", "123");
+      expect(res.status).toBe(202);
+      expect(res.status).toBe(202);
+      expect(res.body).toHaveProperty("status", "event published to Kafka");
     });
 
     it("should return 401 without token", async () => {
@@ -98,8 +99,8 @@ describe("Routes", () => {
         .set("Authorization", token)
         .send({ userId: "user-1" });
 
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("viewerCount");
+      expect(res.status).toBe(202);
+      expect(res.body).toHaveProperty("status", "event published to Kafka");
     });
 
     it("should return 401 without token", async () => {

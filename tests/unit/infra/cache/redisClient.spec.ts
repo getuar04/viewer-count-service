@@ -16,8 +16,10 @@ jest.mock("../../../../src/infra/config/env", () => ({
   },
 }));
 
+const mockLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+
 jest.mock("../../../../src/infra/logger/logger", () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+  logger: mockLogger,
 }));
 
 import { connectRedis } from "../../../../src/infra/redis/redisClient";
@@ -33,5 +35,14 @@ describe("redisClient", () => {
   it("should register error handler", async () => {
     await connectRedis();
     expect(mockClient.on).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+
+  it("should log redis errors from registered handler", async () => {
+    await connectRedis();
+    const errorHandler = mockClient.on.mock.calls.find(([event]) => event === "error")?.[1];
+    const err = new Error("redis failed");
+    errorHandler(err);
+    expect(mockLogger.error).toHaveBeenCalledWith({ err }, "Redis error");
   });
 });

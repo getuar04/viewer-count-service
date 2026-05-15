@@ -35,63 +35,91 @@ jest.mock('../../../../src/infra/redis/redisClient', () => ({
   },
 }));
 
-import { startKafkaConsumer } from '../../../../src/infra/kafka/kafkaConsumer';
+import { processViewerEvent, startKafkaConsumer } from '../../../../src/infra/kafka/kafkaConsumer';
+import { redisClient } from '../../../../src/infra/redis/redisClient';
+import { logger } from '../../../../src/infra/logger/logger';
+
+const mockRedis = redisClient as jest.Mocked<typeof redisClient>;
+
+const runConsumerWith = async (value: Buffer | null) => {
+  mockConsumer.run.mockImplementationOnce(async ({ eachMessage }: any) => {
+    await eachMessage({ message: { value } });
+  });
+  await startKafkaConsumer();
+};
 
 describe('kafkaConsumer', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('should connect consumer', async () => {
+  it('connects, subscribes and starts running consumer', async () => {
     await startKafkaConsumer();
     expect(mockConsumer.connect).toHaveBeenCalled();
-  });
-
-  it('should subscribe to correct topic', async () => {
-    await startKafkaConsumer();
     expect(mockConsumer.subscribe).toHaveBeenCalledWith({ topic: 'viewer-events', fromBeginning: false });
+    expect(mockConsumer.run).toHaveBeenCalled();
   });
 
-  it('should process ViewerJoined event', async () => {
-    const { redisClient } = require('../../../../src/infra/redis/redisClient');
-    mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
-      await eachMessage({ message: { value: Buffer.from(JSON.stringify({ type: 'ViewerJoined', streamId: 'stream-1', userId: 'user-1', timestamp: '' })) } });
-    });
-    await startKafkaConsumer();
-    expect(redisClient.sAdd).toHaveBeenCalled();
+  it('ignores null message value', async () => {
+    await runConsumerWith(null);
+    expect(mockRedis.sAdd).not.toHaveBeenCalled();
   });
 
-  it('should process ViewerLeft event', async () => {
-    const { redisClient } = require('../../../../src/infra/redis/redisClient');
-    mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
-      await eachMessage({ message: { value: Buffer.from(JSON.stringify({ type: 'ViewerLeft', streamId: 'stream-1', userId: 'user-1', timestamp: '' })) } });
-    });
-    await startKafkaConsumer();
-    expect(redisClient.sRem).toHaveBeenCalled();
+  it('logs malformed JSON messages', async () => {
+    await runConsumerWith(Buffer.from('{bad-json'));
+    expect(logger.error).toHaveBeenCalled();
   });
 
-  it('should process StreamStarted event', async () => {
-    const { redisClient } = require('../../../../src/infra/redis/redisClient');
-    mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
-      await eachMessage({ message: { value: Buffer.from(JSON.stringify({ type: 'StreamStarted', streamId: 'stream-1', userId: '', timestamp: '' })) } });
-    });
-    await startKafkaConsumer();
-    expect(redisClient.set).toHaveBeenCalled();
+  it('parses and processes valid Kafka messages from consumer runner', async () => {
+    await runConsumerWith(Buffer.from(JSON.stringify({ type: 'ViewerHeartbeat', streamId: 's1', userId: 'u1' })));
+    expect(mockRedis.setEx).toHaveBeenCalled();
   });
 
-  it('should process StreamEnded event', async () => {
-    const { redisClient } = require('../../../../src/infra/redis/redisClient');
-    mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
-      await eachMessage({ message: { value: Buffer.from(JSON.stringify({ type: 'StreamEnded', streamId: 'stream-1', userId: '', timestamp: '' })) } });
-    });
-    await startKafkaConsumer();
-    expect(redisClient.del).toHaveBeenCalled();
+  it('processes StreamStarted', async () => {
+    await processViewerEvent({ type: 'StreamStarted', streamId: 's1' });
+    expect(mockRedis.set).toHaveBeenCalledWith('active_stream:s1', 'alive');
   });
 
-  it('should ignore null message', async () => {
-    const { redisClient } = require('../../../../src/infra/redis/redisClient');
-    mockConsumer.run.mockImplementation(async ({ eachMessage }: any) => {
-      await eachMessage({ message: { value: null } });
-    });
-    await startKafkaConsumer();
-    expect(redisClient.sAdd).not.toHaveBeenCalled();
+  it('processes StreamEnded', async () => {
+    await processViewerEvent({ type: 'StreamEnded', streamId: 's1' });
+    expect(mockRedis.del).toHaveBeenCalled();
+  });
+
+  it('processes ViewerJoined', async () => {
+    await processViewerEvent({ type: 'ViewerJoined', streamId: 's1', userId: 'u1' });
+    expect(mockRedis.sAdd).toHaveBeenCalled();
+  });
+
+  it('processes ViewerLeft', async () => {
+    await processViewerEvent({ type: 'ViewerLeft', streamId: 's1', userId: 'u1' });
+    expect(mockRedis.sRem).toHaveBeenCalled();
+  });
+
+  it('processes ViewerHeartbeat', async () => {
+    await processViewerEvent({ type: 'ViewerHeartbeat', streamId: 's1', userId: 'u1' });
+    expect(mockRedis.setEx).toHaveBeenCalled();
+  });
+
+  it('rejects event without type or streamId', async () => {
+    await processViewerEvent({ type: '' as any, streamId: '' });
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(Object), 'Invalid Kafka event - missing type or streamId');
+  });
+
+  it('rejects ViewerJoined without userId', async () => {
+    await processViewerEvent({ type: 'ViewerJoined', streamId: 's1' });
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(Object), 'Invalid ViewerJoined event - missing userId');
+  });
+
+  it('rejects ViewerLeft without userId', async () => {
+    await processViewerEvent({ type: 'ViewerLeft', streamId: 's1' });
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(Object), 'Invalid ViewerLeft event - missing userId');
+  });
+
+  it('rejects ViewerHeartbeat without userId', async () => {
+    await processViewerEvent({ type: 'ViewerHeartbeat', streamId: 's1' });
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(Object), 'Invalid ViewerHeartbeat event - missing userId');
+  });
+
+  it('rejects unknown event types', async () => {
+    await processViewerEvent({ type: 'Unknown' as any, streamId: 's1' });
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(Object), 'Unknown Kafka event type');
   });
 });

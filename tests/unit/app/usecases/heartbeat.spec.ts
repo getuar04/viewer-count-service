@@ -5,6 +5,7 @@ const mockRepo: jest.Mocked<IViewerRepository> = {
   leave: jest.fn(),
   heartbeat: jest.fn(),
   getCount: jest.fn(),
+  isStreamActive: jest.fn(),
   streamStarted: jest.fn(),
   streamEnded: jest.fn(),
 };

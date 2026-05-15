@@ -147,7 +147,7 @@ kubectl apply -f k8s/service.yaml
 ```powershell
 kubectl create secret generic viewer-count-secrets `
   --namespace=viewer-count-service `
-  --from-literal=JWT_SECRET="your_jwt_secret_here" `
+  --from-literal=JWT_SECRET="YOUR_JWT_SECRET_HERE" `
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
@@ -400,7 +400,6 @@ docker system prune -f
 
 ```bash
 docker exec -it vcs-redis redis-cli
-
 ```
 
 ```

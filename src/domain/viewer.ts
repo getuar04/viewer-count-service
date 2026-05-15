@@ -1,6 +1,14 @@
+export type ViewerEventType =
+  | 'ViewerJoined'
+  | 'ViewerLeft'
+  | 'ViewerHeartbeat'
+  | 'StreamStarted'
+  | 'StreamEnded';
+
 export interface ViewerEvent {
-  type: 'ViewerJoined' | 'ViewerLeft' | 'ViewerHeartbeat' | 'StreamStarted' | 'StreamEnded';
+  type: ViewerEventType;
   streamId: string;
-  userId: string;
-  timestamp: string;
+  userId?: string;
+  creatorId?: string;
+  timestamp?: string;
 }

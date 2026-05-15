@@ -21,7 +21,7 @@ const options: swaggerJsdoc.Options = {
     paths: {
       '/streams/{streamId}/start': {
         post: {
-          summary: 'Start a live stream',
+          summary: 'Publish StreamStarted event to Kafka (temporary test endpoint)',
           security: [{ bearerAuth: [] }],
           parameters: [{ in: 'path', name: 'streamId', required: true, schema: { type: 'string' } }],
           responses: {
@@ -32,7 +32,7 @@ const options: swaggerJsdoc.Options = {
       },
       '/streams/{streamId}/end': {
         post: {
-          summary: 'End a live stream',
+          summary: 'Publish StreamEnded event to Kafka (temporary test endpoint)',
           security: [{ bearerAuth: [] }],
           parameters: [{ in: 'path', name: 'streamId', required: true, schema: { type: 'string' } }],
           responses: {
@@ -43,7 +43,7 @@ const options: swaggerJsdoc.Options = {
       },
       '/streams/{streamId}/join': {
         post: {
-          summary: 'Join a live stream',
+          summary: 'Publish ViewerJoined event to Kafka',
           security: [{ bearerAuth: [] }],
           parameters: [{ in: 'path', name: 'streamId', required: true, schema: { type: 'string' } }],
           responses: {
@@ -55,7 +55,7 @@ const options: swaggerJsdoc.Options = {
       },
       '/streams/{streamId}/leave': {
         post: {
-          summary: 'Leave a live stream',
+          summary: 'Publish ViewerLeft event to Kafka',
           security: [{ bearerAuth: [] }],
           parameters: [{ in: 'path', name: 'streamId', required: true, schema: { type: 'string' } }],
           responses: {
@@ -66,11 +66,40 @@ const options: swaggerJsdoc.Options = {
       },
       '/streams/{streamId}/heartbeat': {
         post: {
-          summary: 'Send heartbeat',
+          summary: 'Publish ViewerHeartbeat event to Kafka',
           security: [{ bearerAuth: [] }],
           parameters: [{ in: 'path', name: 'streamId', required: true, schema: { type: 'string' } }],
           responses: {
             200: { description: 'Heartbeat received' },
+            401: { description: 'Unauthorized' },
+          },
+        },
+      },
+
+      '/dev/events/trigger': {
+        post: {
+          summary: 'Dev-only Kafka event trigger for manual testing',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['type', 'streamId'],
+                  properties: {
+                    type: { type: 'string', enum: ['StreamStarted', 'StreamEnded', 'ViewerJoined', 'ViewerLeft', 'ViewerHeartbeat'] },
+                    streamId: { type: 'string' },
+                    userId: { type: 'string' },
+                    creatorId: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            202: { description: 'Event published to Kafka' },
+            400: { description: 'Invalid event payload' },
             401: { description: 'Unauthorized' },
           },
         },

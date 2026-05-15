@@ -2,13 +2,12 @@ sequenceDiagram
     autonumber
     actor U as User
     participant V as Viewer Count Service
-    participant K as Kafka
     participant R as Redis
+    participant K as Kafka
 
-    Note over U,R: 1. Heartbeat
+    Note over U,K: 1. Heartbeat
     loop every 30s
-        U->>V: POST /streams/{streamId}/heartbeat {userId}
-        V->>V: validate JWT token
+        U->>V: POST /streams/{streamId}/heartbeat
         V->>K: publish ViewerHeartbeat {streamId, userId}
         K->>V: consume ViewerHeartbeat
         V->>R: SETEX viewer:{userId} 60
