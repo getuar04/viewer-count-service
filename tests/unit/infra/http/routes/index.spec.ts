@@ -3,7 +3,6 @@ jest.mock("kafkajs", () => ({
     producer: jest.fn().mockReturnValue({
       connect: jest.fn().mockResolvedValue(undefined),
       send: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
     }),
     consumer: jest.fn().mockReturnValue({
       connect: jest.fn().mockResolvedValue(undefined),

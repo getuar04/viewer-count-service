@@ -400,6 +400,7 @@ docker system prune -f
 
 ```bash
 docker exec -it vcs-redis redis-cli
+
 ```
 
 ```

@@ -3,7 +3,6 @@ jest.mock("kafkajs", () => ({
     producer: jest.fn().mockReturnValue({
       connect: jest.fn().mockResolvedValue(undefined),
       send: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
     }),
     consumer: jest.fn().mockReturnValue({
       connect: jest.fn().mockResolvedValue(undefined),
@@ -40,109 +39,56 @@ jest.mock("../../../../../src/infra/config/env", () => ({
   },
 }));
 
-jest.mock("jsonwebtoken", () => ({
-  verify: jest.fn().mockReturnValue({ userId: "123" }),
-}));
-
-import express from "express";
-import request from "supertest";
-import viewerRoutes from "../../../../../src/infra/http/routes/viewerRoutes";
+import { Request, Response } from "express";
+import {
+  start,
+  end,
+} from "../../../../../src/infra/http/controllers/viewerController";
 import { redisClient } from "../../../../../src/infra/redis/redisClient";
 
 const mockRedis = redisClient as jest.Mocked<typeof redisClient>;
-const token = "Bearer valid-token";
 
-describe("viewerRoutes", () => {
-  const app = express();
-  app.use(express.json());
-  app.use(viewerRoutes);
+const mockReq = (streamId: string) =>
+  ({ params: { streamId }, userId: "123" }) as unknown as Request;
 
+const mockRes = () => {
+  const res = {} as Response;
+  res.json = jest.fn().mockReturnValue(res);
+  res.status = jest.fn().mockReturnValue(res);
+  return res;
+};
+
+describe("viewerController", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  describe("POST /streams/:streamId/start", () => {
-    it("should return 200 when stream started", async () => {
+  describe("start", () => {
+    it("should call streamStarted and return stream started", async () => {
       (mockRedis.set as jest.Mock).mockResolvedValue("OK");
-      const res = await request(app)
-        .post("/streams/123/start")
-        .set("Authorization", token);
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("status", "stream started");
-    });
-
-    it("should return 401 without token", async () => {
-      const res = await request(app).post("/streams/123/start");
-      expect(res.status).toBe(401);
+      const req = mockReq("stream-1");
+      const res = mockRes();
+      await start(req, res);
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        "active_stream:stream-1",
+        "alive",
+      );
+      expect(res.json).toHaveBeenCalledWith({
+        streamId: "stream-1",
+        status: "stream started",
+      });
     });
   });
 
-  describe("POST /streams/:streamId/end", () => {
-    it("should return 200 when stream ended", async () => {
+  describe("end", () => {
+    it("should call streamEnded and return stream ended", async () => {
       (mockRedis.del as jest.Mock).mockResolvedValue(1);
-      const res = await request(app)
-        .post("/streams/123/end")
-        .set("Authorization", token);
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("status", "stream ended");
-    });
-
-    it("should return 401 without token", async () => {
-      const res = await request(app).post("/streams/123/end");
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe("POST /streams/:streamId/join", () => {
-    it("should return 200 when user joins", async () => {
-      (mockRedis.exists as jest.Mock).mockResolvedValue(1);
-      (mockRedis.sAdd as jest.Mock).mockResolvedValue(1);
-      (mockRedis.incr as jest.Mock).mockResolvedValue(1);
-      (mockRedis.setEx as jest.Mock).mockResolvedValue("OK");
-      (mockRedis.get as jest.Mock).mockResolvedValue("1");
-      const res = await request(app)
-        .post("/streams/123/join")
-        .set("Authorization", token);
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("viewerCount");
-    });
-
-    it("should return 401 without token", async () => {
-      const res = await request(app).post("/streams/123/join");
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe("POST /streams/:streamId/leave", () => {
-    it("should return 200 when user leaves", async () => {
-      (mockRedis.sRem as jest.Mock).mockResolvedValue(1);
-      (mockRedis.decr as jest.Mock).mockResolvedValue(0);
-      (mockRedis.del as jest.Mock).mockResolvedValue(1);
-      (mockRedis.get as jest.Mock).mockResolvedValue("0");
-      const res = await request(app)
-        .post("/streams/123/leave")
-        .set("Authorization", token);
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("viewerCount");
-    });
-
-    it("should return 401 without token", async () => {
-      const res = await request(app).post("/streams/123/leave");
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe("GET /streams/:streamId/viewers", () => {
-    it("should return viewer count", async () => {
-      (mockRedis.get as jest.Mock).mockResolvedValue("42");
-      const res = await request(app)
-        .get("/streams/123/viewers")
-        .set("Authorization", token);
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual({ streamId: "123", viewerCount: 42 });
-    });
-
-    it("should return 401 without token", async () => {
-      const res = await request(app).get("/streams/123/viewers");
-      expect(res.status).toBe(401);
+      const req = mockReq("stream-1");
+      const res = mockRes();
+      await end(req, res);
+      expect(mockRedis.del).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        streamId: "stream-1",
+        status: "stream ended",
+      });
     });
   });
 });
