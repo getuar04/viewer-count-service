@@ -82,7 +82,7 @@ PYEOF
               -n ${K8S_NAMESPACE} ${kube}
           """
           sh "kubectl rollout restart deployment/viewer-count-service -n ${K8S_NAMESPACE} ${kube}"
-          sh "kubectl rollout status deployment/viewer-count-service -n ${K8S_NAMESPACE} ${kube} --timeout=300s"
+          sh "kubectl rollout status deployment/viewer-count-service -n ${K8S_NAMESPACE} ${kube} --timeout=600s"
         }
       }
     }
