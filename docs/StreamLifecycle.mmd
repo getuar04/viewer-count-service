@@ -1,48 +1,39 @@
 sequenceDiagram
     autonumber
     actor U as User
-    participant SS as Stream Service
-    participant K as Kafka
+    participant LS as Live Service
+    participant ETS as Event Tracking Service
     participant V as Viewer Count Service
     participant R as Redis
-    
+    participant K as Kafka
 
-    Note over SS,R: 1. Stream Started
-
-    SS->>K: publish StreamStarted {streamId, creatorId}
+    Note over LS,K: 1. Stream Started
+    LS->>K: publish StreamStarted {streamId, creatorId}
     K->>V: consume StreamStarted
     V->>R: SET active_stream:{streamId} "alive"
     R-->>V: OK
 
-    Note over U,R: 2. Join Stream with Validation
-
-    U->>V: POST /streams/{streamId}/join {userId}
-    V->>V: validate JWT token
-    alt token valid
-        V->>R: EXISTS active_stream:{streamId}
-        R-->>V: 1 (active) or 0 (not found)
-        alt stream active
-            V->>K: publish ViewerJoined {streamId, userId}
-            V-->>U: 200 OK
-            K->>V: consume ViewerJoined
-            V->>R: SADD stream:{streamId}:viewers {userId}
-            R-->>V: 1 (new) or 0 (duplicate)
-            alt new viewer
-                V->>R: INCR viewer_count
-                V->>R: SETEX viewer:{userId} 60
-            else duplicate
-                V->>R: SETEX viewer:{userId} 60
-            end
-        else stream not active
-            V-->>U: 400 Bad Request
+    Note over U,K: 2. Join Stream me Validim
+    U->>ETS: user joins live
+    ETS->>K: publish ViewerJoined {streamId, userId}
+    K->>V: consume ViewerJoined
+    V->>R: EXISTS active_stream:{streamId}
+    R-->>V: 1 (active) or 0 (not found)
+    alt stream active
+        V->>R: SADD stream:{streamId}:viewers {userId}
+        R-->>V: 1 (new) or 0 (duplicate)
+        alt new viewer
+            V->>R: INCR viewer_count
+            V->>R: SETEX stream:{streamId}:viewer:{userId} 60
+        else duplicate
+            V->>R: SETEX stream:{streamId}:viewer:{userId} 60
         end
-    else token invalid
-        V-->>U: 401 Unauthorized
+    else stream not active
+        Note over V: Skip event - stream not active
     end
 
-    Note over SS,R: 3. Stream Ended
-
-    SS->>K: publish StreamEnded {streamId}
+    Note over LS,K: 3. Stream Ended
+    LS->>K: publish StreamEnded {streamId}
     K->>V: consume StreamEnded
     V->>R: DEL active_stream:{streamId}
     V->>R: DEL stream:{streamId}:viewer_count

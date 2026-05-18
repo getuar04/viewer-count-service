@@ -7,19 +7,18 @@ sequenceDiagram
 
     Note over U,K: 1. Heartbeat
     loop every 30s
-        U->>V: POST /streams/{streamId}/heartbeat
+        U->>V: user still watching
         V->>K: publish ViewerHeartbeat {streamId, userId}
         K->>V: consume ViewerHeartbeat
-        V->>R: SETEX viewer:{userId} 60
+        V->>R: SETEX stream:{streamId}:viewer:{userId} 60
     end
 
-    Note over V,R: 2. Ghost User
-    R->>V: EXPIRED viewer:{userId}
-    V->>R: SISMEMBER viewers {userId}
+    Note over V,R: 2. Ghost User Detection
+    R->>V: EXPIRED stream:{streamId}:viewer:{userId}
+    V->>R: SISMEMBER stream:{streamId}:viewers {userId}
     R-->>V: 1 or 0
     alt exists
-        V->>R: SREM viewers {userId}
-        V->>R: DECR viewer_count
+        V->>R: SREM stream:{streamId}:viewers {userId}
+        V->>R: DECR stream:{streamId}:viewer_count
     else already removed
-        Note over V: Ignore
     end

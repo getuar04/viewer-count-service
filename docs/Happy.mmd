@@ -1,13 +1,12 @@
 sequenceDiagram
     autonumber
     actor U as User
-    participant SS as Stream Service
+    participant LS as Live Service
     participant V as Viewer Count Service
     participant R as Redis
     participant K as Kafka
 
-   
-    Note over U,K: 1. Join Stream
+    Note over U,K: 2. Join Stream
     U->>V: POST /streams/{streamId}/join
     V->>R: EXISTS active_stream:{streamId}
     R-->>V: 1 (active) or 0 (not found)
@@ -27,7 +26,7 @@ sequenceDiagram
         V-->>U: 400 Bad Request
     end
 
-    Note over U,K: 2. Leave Stream
+    Note over U,K: 3. Leave Stream
     U->>V: POST /streams/{streamId}/leave
     V->>K: publish ViewerLeft {streamId, userId}
     V-->>U: 200 OK
@@ -41,15 +40,15 @@ sequenceDiagram
         Note over V: Ignore
     end
 
-    Note over SS,K: 3. Stream Ended
-    SS->>K: publish StreamEnded {streamId}
+    Note over LS,K: 4. Stream Ended
+    LS->>K: publish StreamEnded {streamId}
     K->>V: consume StreamEnded
     V->>R: DEL active_stream:{streamId}
     V->>R: DEL stream:{streamId}:viewer_count
     V->>R: DEL stream:{streamId}:viewers
     R-->>V: OK
 
-    Note over U,R: 4. Get Viewer Count
+    Note over U,R: 5. Get Viewer Count
     U->>V: GET /streams/{streamId}/viewers
     V->>R: GET viewer_count
     R-->>V: N

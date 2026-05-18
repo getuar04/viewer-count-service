@@ -1,445 +1,231 @@
-# Viewer Count Service
-
-A real-time microservice that tracks live stream viewer counts using Redis and Kafka. Built with Node.js, TypeScript, and clean architecture principles.
+# Viewer Count Service — Komandat
 
 ---
 
-## Overview
+## 1. Docker Compose — Starto lokalisht
 
-When a user joins a live stream, an event is published to Kafka. The Viewer Count Service consumes that event and updates a counter in Redis instantly. The service also handles **ghost users** — viewers who lose internet connection without sending a leave event — using Redis TTL and Keyspace Notifications.
-
----
-
-## Tech Stack
-
-| Technology              | Purpose                            |
-| ----------------------- | ---------------------------------- |
-| Node.js + TypeScript    | Runtime and language               |
-| Express                 | HTTP server                        |
-| Redis                   | Real-time counter and TTL tracking |
-| Kafka + Zookeeper       | Async event consumption            |
-| JWT + Keycloak          | Authentication                     |
-| Pino                    | Structured logging                 |
-| Jest + ts-jest          | Unit testing (97.66% coverage)     |
-| Docker + Docker Compose | Local containerization             |
-| Kubernetes              | Production orchestration           |
-| Jenkins                 | CI/CD pipeline                     |
-
----
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── ports/            # Interfaces (IViewerRepository)
-│   └── usecases/         # JoinStream, LeaveStream, GetViewerCount
-├── domain/
-│   └── viewer.ts         # ViewerEvent type
-├── infra/
-│   ├── cache/            # Redis client + Keyspace listener
-│   ├── config/           # Environment variables
-│   ├── health/           # Health check endpoint
-│   ├── http/
-│   │   ├── middlewares/  # JWT auth middleware
-│   │   └── routes/       # REST endpoints
-│   ├── logger/           # Pino structured logger
-│   ├── messaging/        # Kafka consumer
-│   └── persistence/      # RedisViewerRepository
-├── app.ts
-├── di.ts                 # Dependency injection
-└── index.ts              # Bootstrap
-k8s/
-├── namespace.yaml
-├── configmap.yaml
-├── deployment.yaml
-├── service.yaml
-├── redis.yaml
-└── kafka.yaml
-tests/
-└── unit/                 # 52 unit tests
-```
-
----
-
-## Prerequisites
-
-- Docker Desktop with Kubernetes enabled
-- Node.js 20+
-- Jenkins (optional for CI/CD)
-
----
-
-## Local Development with Docker Compose
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/getuar04/viewer-count-service.git
-cd viewer-count-service
-```
-
-### 2. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```env
-PORT=3000
-REDIS_HOST=redis
-REDIS_PORT=6379
-KAFKA_BROKER=kafka:9092
-KAFKA_GROUP_ID=viewer-count-group
-KAFKA_TOPIC=viewer-events
-JWT_SECRET=your_secret_here
-```
-
-### 3. Start with Docker Compose
-
-```bash
+```powershell
+# Starto të gjitha services
 docker-compose up -d --build
-```
 
-### 4. Enable Redis Keyspace Notifications
+# Kontrollo containers
+docker ps
 
-```bash
-docker exec -it vcs-redis redis-cli config set notify-keyspace-events Ex
-```
+# Shiko logs live
+docker logs -f vcs-app
 
-### 5. Verify the service
-
-```bash
-curl http://localhost:3000/health
-```
-
-Expected:
-
-```json
-{ "status": "ok", "redis": "connected" }
+# Ndalo
+docker-compose down
 ```
 
 ---
 
-## Kubernetes Deployment
+## 2. Docker — Build Image
 
-### 1. Build Docker image
-
-```bash
+```powershell
+# Build image
 docker build -t viewer-count-service:latest .
+
+# Build me tag specifik
+docker build -t viewer-count-service:build-26 -t viewer-count-service:latest .
 ```
 
-### 2. Create namespace and apply manifests
+---
 
-```bash
+## 3. Kubernetes — Deploy
+
+```powershell
+# Apliko të gjitha manifests
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
 kubectl apply -f k8s/redis.yaml
 kubectl apply -f k8s/kafka.yaml
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
-```
 
-### 3. Create secret (never commit to Git)
-
-```powershell
+# Krijo secret
 kubectl create secret generic viewer-count-secrets `
   --namespace=viewer-count-service `
-  --from-literal=JWT_SECRET="YOUR_JWT_SECRET_HERE" `
+  --from-literal=JWT_SECRET="657928478954RUHD879YHN38R7Y9UJD3HY6R87HIDY3H879UEJH7389RYUN487EY9RHID3879HD387WIHSDNBYU3R87EY3879HD2UY3R7hdubuy3d7dh398ndyx3edhuy87diu" `
   --dry-run=client -o yaml | kubectl apply -f -
-```
 
-### 4. Verify pods
-
-```bash
+# Kontrollo pods
 kubectl get pods -n viewer-count-service
 ```
 
-Expected output:
-
-```
-NAME                                  READY   STATUS    RESTARTS
-kafka-xxx                             1/1     Running   0
-redis-xxx                             1/1     Running   0
-viewer-count-service-xxx              1/1     Running   0
-zookeeper-xxx                         1/1     Running   0
-```
-
-### 5. Test via port-forward
-
-```bash
-kubectl port-forward -n viewer-count-service deployment/viewer-count-service 3001:3000
-curl http://localhost:3001/health
-```
-
 ---
 
-## CI/CD with Jenkins
-
-### Setup Jenkins
-
-Build the custom Jenkins image:
-
-```bash
-docker build -f Dockerfile.jenkins -t jenkins-custom .
-```
-
-Run Jenkins:
+## 4. Kubernetes — Rollout
 
 ```powershell
-.\jenkins-docker-run.sh
-```
+# Restart deployment
+kubectl rollout restart deployment/viewer-count-service -n viewer-count-service
 
-Jenkins will be available at `http://localhost:8080`.
+# Kontrollo status
+kubectl rollout status deployment/viewer-count-service -n viewer-count-service --timeout=600s
 
-Get initial admin password:
-
-```bash
-docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
-```
-
-### Configure Pipeline
-
-1. New Item → Pipeline
-2. Pipeline script from SCM → Git
-3. Repository URL: `https://github.com/getuar04/viewer-count-service.git`
-4. Branch: `*/main`
-5. Script Path: `Jenkinsfile`
-
-### Enable Auto-trigger on Push (Webhook)
-
-1. Install **ngrok**: https://ngrok.com
-2. Expose Jenkins locally:
-
-```bash
-ngrok http 8080
-```
-
-3. Copy the ngrok URL (e.g. `https://abc123.ngrok.io`)
-4. Go to GitHub repo → **Settings → Webhooks → Add webhook**
-   - Payload URL: `https://abc123.ngrok.io/github-webhook/`
-   - Content type: `application/json`
-   - Event: **Just the push event**
-5. In Jenkins → Pipeline → **Build Triggers** → check **GitHub hook trigger for GITScm polling**
-
-Every `git push` to `main` will now automatically trigger the full pipeline.
-
-### Pipeline Stages
-
-| Stage                | Description                                   |
-| -------------------- | --------------------------------------------- |
-| Checkout             | Pulls latest code from GitHub                 |
-| Setup Kubeconfig     | Configures kubectl for deployment             |
-| Install Dependencies | Runs `npm install`                            |
-| Run Tests            | Runs Jest with coverage report                |
-| Build Docker Image   | Builds and tags Docker image                  |
-| Deploy to Kubernetes | Applies K8s manifests and rolls out new image |
-
----
-
-## API Endpoints
-
-All endpoints require a valid JWT token in the Authorization header:
-
-```
-Authorization: Bearer <token>
-```
-
-Generate a token at **jwt.io** using your `JWT_SECRET` with payload `{ "userId": "123" }`.
-
-### Join Stream
-
-```http
-POST /streams/{streamId}/join
-Content-Type: application/json
-
-{ "userId": "123" }
-```
-
-Response:
-
-```json
-{ "streamId": "456", "viewerCount": 1 }
-```
-
-### Leave Stream
-
-```http
-POST /streams/{streamId}/leave
-Content-Type: application/json
-
-{ "userId": "123" }
-```
-
-Response:
-
-```json
-{ "streamId": "456", "viewerCount": 0 }
-```
-
-### Get Viewer Count
-
-```http
-GET /streams/{streamId}/viewers
-```
-
-Response:
-
-```json
-{ "streamId": "456", "viewerCount": 3847 }
-```
-
-### Health Check
-
-```http
-GET /health
-```
-
-Response:
-
-```json
-{ "status": "ok", "redis": "connected" }
+# Update image
+kubectl set image deployment/viewer-count-service `
+  viewer-count-service=viewer-count-service:build-26 `
+  -n viewer-count-service
 ```
 
 ---
 
-## Kafka Events
+## 5. Kubernetes — Port Forward dhe Testing
 
-The service consumes events from the `viewer-events` topic.
+```powershell
+# Port forward
+kubectl port-forward -n viewer-count-service deployment/viewer-count-service 3001:3000
 
-### Event Types
+# Logs
+kubectl logs -f -n viewer-count-service deployment/viewer-count-service
+```
+
+---
+
+## 6. Redis — Docker Compose
+
+```powershell
+# Hyr brenda
+docker exec -it vcs-redis redis-cli
+
+# Shiko të gjitha keys
+docker exec -it vcs-redis redis-cli KEYS "*"
+
+# Stream aktiv
+docker exec -it vcs-redis redis-cli GET active_stream:789
+
+# Viewer count
+docker exec -it vcs-redis redis-cli GET stream:789:viewer_count
+
+# Lista viewers
+docker exec -it vcs-redis redis-cli SMEMBERS stream:789:viewers
+
+# TTL heartbeat
+docker exec -it vcs-redis redis-cli TTL stream:789:viewer:12
+```
+
+---
+
+## 7. Redis — Kubernetes
+
+```powershell
+# Shiko të gjitha keys
+kubectl exec -it -n viewer-count-service deployment/redis -- redis-cli KEYS "*"
+
+# Stream aktiv
+kubectl exec -it -n viewer-count-service deployment/redis -- redis-cli GET active_stream:789
+
+# Viewer count
+kubectl exec -it -n viewer-count-service deployment/redis -- redis-cli GET stream:789:viewer_count
+
+# Lista viewers
+kubectl exec -it -n viewer-count-service deployment/redis -- redis-cli SMEMBERS stream:789:viewers
+
+# TTL heartbeat
+kubectl exec -it -n viewer-count-service deployment/redis -- redis-cli TTL stream:789:viewer:12
+```
+
+---
+
+## 8. Kafka — Publiko Evente (Docker)
+
+```powershell
+# Hyr brenda Kafka
+docker exec -it vcs-kafka bash
+
+# Hap producer
+kafka-console-producer --bootstrap-server localhost:9092 --topic viewer-events
+```
+
+**Evente për të dërguar:**
 
 ```json
-{ "type": "ViewerJoined", "streamId": "456", "userId": "123", "timestamp": "..." }
-{ "type": "ViewerLeft", "streamId": "456", "userId": "123", "timestamp": "..." }
-{ "type": "ViewerHeartbeat", "streamId": "456", "userId": "123", "timestamp": "..." }
-```
-
-### Test Kafka manually (Docker Compose)
-
-```bash
-docker exec -it vcs-kafka kafka-console-producer --broker-list kafka:9092 --topic viewer-events
-```
-
-Then type and press Enter:
-
-```json
-{
-  "type": "ViewerJoined",
-  "streamId": "456",
-  "userId": "123",
-  "timestamp": "2026-05-12T12:00:00Z"
-}
+{"type":"StreamStarted","streamId":"789","creatorId":"456","timestamp":"2026-05-15T10:00:00Z"}
+{"type":"ViewerJoined","streamId":"789","userId":"123","timestamp":"2026-05-15T10:00:10Z"}
+{"type":"ViewerHeartbeat","streamId":"789","userId":"123","timestamp":"2026-05-15T10:00:40Z"}
+{"type":"ViewerLeft","streamId":"789","userId":"123","timestamp":"2026-05-15T10:01:00Z"}
+{"type":"StreamEnded","streamId":"789","timestamp":"2026-05-15T10:05:00Z"}
 ```
 
 ---
 
-## Redis Data Structure
+## 9. Teste
 
-| Key                                 | Type             | Purpose                   |
-| ----------------------------------- | ---------------- | ------------------------- |
-| `stream:{streamId}:viewers`         | Set              | Active viewer user IDs    |
-| `stream:{streamId}:viewer_count`    | String           | Current count (O(1) read) |
-| `stream:{streamId}:viewer:{userId}` | String + TTL 60s | Heartbeat tracker         |
-
----
-
-## Ghost User Detection
-
-If a viewer loses internet without sending a leave event, their TTL expires after 60 seconds. Redis fires a Keyspace Notification and the service automatically removes them from the count.
-
-Heartbeat is sent every **30 seconds**, TTL is **60 seconds** — giving 30 seconds buffer for network delays.
-
----
-
-## Running Tests
-
-```bash
+```powershell
+# Ekzekuto testet
 npm test
-```
 
-With coverage:
-
-```bash
+# Ekzekuto me coverage
 npm test -- --coverage
 ```
 
-Current coverage: **97.66%** across 52 tests.
+---
+
+## 10. Curl — Testo API
+
+```powershell
+# Health check
+curl http://localhost:3000/health
+
+# Trigger event (dev endpoint)
+curl -X POST `
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw" `
+  -H "Content-Type: application/json" `
+  -d '{"type":"StreamStarted","streamId":"789","creatorId":"456"}' `
+  http://localhost:3000/dev/events/trigger
+
+# Get viewer count
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw" `
+  http://localhost:3000/streams/789/viewers
+```
 
 ---
 
-## Stop Everything
-
-### Docker Compose
-
-```bash
-docker-compose down
-```
-
-### Kubernetes
-
-```bash
-kubectl delete namespace viewer-count-service
-```
-
-### Jenkins
-
-```bash
-docker stop jenkins
-```
-
-### Clean Docker resources
-
-```bash
-docker system prune -f
-```
-
-### Redis CLI
-
-```bash
-docker exec -it vcs-redis redis-cli
-```
+## 11. Swagger UI
 
 ```
-kubectl exec -it -n viewer-count-service deployment/redis -- redis-cli
+http://localhost:3000/api-docs   # Docker Compose
+http://localhost:3001/api-docs   # Kubernetes
 ```
 
-Then inside Redis CLI:
+**Token:**
 
-```redis
-GET active_stream:456
-GET stream:456:viewer_count
-SMEMBERS stream:456:viewers
-TTL stream:456:viewer:123
 ```
-
-### Kafka CLI
-
-```bash
-docker exec -it vcs-kafka bash
-kafka-console-consumer --bootstrap-server localhost:9092 --topic viewer-events --from-beginning
-```
-
-### logs 
-```bash
-docker logs -f viewer-count-service
-
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw
+```
 
-# Health check
+---
 
-curl http://localhost:3001/health
+## 12. Flow i plotë për testing
 
-# Start stream
+```powershell
+# 1. Starto Docker Compose
+docker-compose up -d --build
 
-curl -X POST -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw" http://localhost:3001/streams/456/start
+# 2. Trego Swagger ose Postman - StreamStarted
+curl -X POST -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" `
+  -d '{"type":"StreamStarted","streamId":"789","creatorId":"456"}' `
+  http://localhost:3000/dev/events/trigger
 
-# Join stream
+# 3. ViewerJoined
+curl -X POST -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" `
+  -d '{"type":"ViewerJoined","streamId":"789","userId":"123"}' `
+  http://localhost:3000/dev/events/trigger
 
-curl -X POST -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw" http://localhost:3001/streams/456/join
+# 4. Kontrollo Redis
+docker exec -it vcs-redis redis-cli GET stream:789:viewer_count
+docker exec -it vcs-redis redis-cli SMEMBERS stream:789:viewers
 
-# Get viewer count
+# 5. Get viewers
+curl -H "Authorization: Bearer TOKEN" http://localhost:3000/streams/789/viewers
 
-curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMiJ9.GO1hPCTR9yw7erPlPF3Jz_1symFY1xLYnXy3GtPtrGw" http://localhost:3001/streams/456/viewers
+# 6. StreamEnded
+curl -X POST -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" `
+  -d '{"type":"StreamEnded","streamId":"789"}' `
+  http://localhost:3000/dev/events/trigger
+
+# 7. Verifiko Redis i pastruar
+docker exec -it vcs-redis redis-cli KEYS "*"
+```

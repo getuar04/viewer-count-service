@@ -1,96 +1,65 @@
 sequenceDiagram
     autonumber
     actor U as User
-    participant KC as Keycloak
-    participant SS as Stream Service
+    participant LS as Live Service
+    participant ETS as Event Tracking Service
     participant V as Viewer Count Service
-    participant K as Kafka
     participant R as Redis
+    participant K as Kafka
 
-    Note over U,R: 0. Authentication
-
-    U->>KC: POST /login {username, password}
-    KC-->>U: accessToken + refreshToken
-    Note over U: extracts userId from accessToken
-
-    Note over SS,R: 1. Stream Started
-
-    SS->>K: publish StreamStarted {streamId, creatorId}
+    Note over LS,K: 1. Stream Started
+    LS->>K: publish StreamStarted {streamId, creatorId}
     K->>V: consume StreamStarted
     V->>R: SET active_stream:{streamId} "alive"
     R-->>V: OK
 
-    Note over U,R: 2. Join Stream
-
-    U->>V: POST /streams/{streamId}/join {userId}
-    V->>V: validate JWT token
-    alt token valid
-        V->>R: EXISTS active_stream:{streamId}
-        R-->>V: 1 (active) or 0 (not found)
-        alt stream active
-            V->>K: publish ViewerJoined {streamId, userId, timestamp}
-            V-->>U: 200 OK
-            K->>V: consume ViewerJoined
-            V->>R: SADD stream:{streamId}:viewers {userId}
-            R-->>V: 1 (new) or 0 (duplicate)
-            alt new viewer
-                V->>R: INCR viewer_count
-                V->>R: SETEX viewer:{userId} 60
-            else duplicate
-                V->>R: SETEX viewer:{userId} 60
-            end
-        else stream not active
-            V-->>U: 400 Bad Request
-        end
-    else token invalid
-        V-->>U: 401 Unauthorized
+    Note over U,K: 2. Join Stream
+    U->>ETS: user joins live
+    ETS->>K: publish ViewerJoined {streamId, userId}
+    K->>V: consume ViewerJoined
+    V->>R: EXISTS active_stream:{streamId}
+    R-->>V: 1 (active)
+    V->>R: SADD stream:{streamId}:viewers {userId}
+    alt new viewer
+        V->>R: INCR viewer_count
+        V->>R: SETEX stream:{streamId}:viewer:{userId} 60
+    else duplicate
+        V->>R: SETEX stream:{streamId}:viewer:{userId} 60
     end
 
-    Note over U,R: 3. Heartbeat
-
+    Note over U,K: 3. Heartbeat
     loop every 30s
-        U->>V: POST /streams/{streamId}/heartbeat {userId}
-        V->>V: validate JWT token
-        V->>K: publish ViewerHeartbeat {streamId, userId}
+        U->>ETS: user still watching
+        ETS->>K: publish ViewerHeartbeat {streamId, userId}
         K->>V: consume ViewerHeartbeat
-        V->>R: SETEX viewer:{userId} 60
+        V->>R: SETEX stream:{streamId}:viewer:{userId} 60
     end
 
-    Note over U,R: 4. Leave Stream
-
-    U->>V: POST /streams/{streamId}/leave {userId}
-    V->>V: validate JWT token
-    alt token valid
-        V->>K: publish ViewerLeft {streamId, userId, timestamp}
-        V-->>U: 200 OK
-        K->>V: consume ViewerLeft
-        V->>R: SREM stream:{streamId}:viewers {userId}
-        R-->>V: 1 (removed) or 0 (not found)
-        alt removed
-            V->>R: DECR viewer_count
-            V->>R: DEL viewer:{userId}
-        else not found
-            Note over V: Ignore
-        end
-    else token invalid
-        V-->>U: 401 Unauthorized
+    Note over U,K: 4. Leave Stream
+    U->>ETS: user leaves live
+    ETS->>K: publish ViewerLeft {streamId, userId}
+    K->>V: consume ViewerLeft
+    V->>R: SREM stream:{streamId}:viewers {userId}
+    alt removed
+        V->>R: DECR viewer_count
+        V->>R: DEL stream:{streamId}:viewer:{userId}
+    else not found
+        Note over V: Ignore
     end
 
     Note over V,R: 5. Ghost User
-
-    R->>V: EXPIRED viewer:{userId}
-    V->>R: SISMEMBER viewers {userId}
+    R->>V: EXPIRED stream:{streamId}:viewer:{userId}
+    V->>R: SISMEMBER stream:{streamId}:viewers {userId}
     R-->>V: 1 or 0
     alt exists
-        V->>R: SREM viewers {userId}
-        V->>R: DECR viewer_count
+        V->>R: SREM stream:{streamId}:viewers {userId}
+        V->>R: DECR stream:{streamId}:viewer_count
     else already removed
         Note over V: Ignore
     end
 
-    Note over SS,R: 6. Stream Ended
-
-    SS->>K: publish StreamEnded {streamId}
+    Note over LS,K: 6. Stream Ended
+    LS->>K: publish StreamEnded {streamId}
     K->>V: consume StreamEnded
     V->>R: DEL active_stream:{streamId}
     V->>R: DEL stream:{streamId}:viewer_count
@@ -98,13 +67,7 @@ sequenceDiagram
     R-->>V: OK
 
     Note over U,R: 7. Get Viewer Count
-
     U->>V: GET /streams/{streamId}/viewers
-    V->>V: validate JWT token
-    alt token valid
-        V->>R: GET viewer_count
-        R-->>V: N
-        V-->>U: 200 OK {viewerCount: N}
-    else token invalid
-        V-->>U: 401 Unauthorized
-    end
+    V->>R: GET stream:{streamId}:viewer_count
+    R-->>V: N
+    V-->>U: 200 OK {viewerCount: N}
